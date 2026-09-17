@@ -9,9 +9,11 @@ type Product = {
   stock: number;
 };
 
-export default function Home() {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://my-custom-api-delta.vercel.app";
 
+export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
 
   const [name, setName] = useState("");
@@ -34,34 +36,35 @@ export default function Home() {
       setLoading(true);
       setError("");
 
-      if (!API_URL) {
-        throw new Error("NEXT_PUBLIC_API_URL belum ditemukan.");
-      }
+      const res = await fetch(`${API_URL}/api/products`, {
+        cache: "no-store",
+      });
 
-      const response = await fetch(`${API_URL}/api/products`);
+      const response = await res.json();
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
+      if (!res.ok || !response.success) {
         throw new Error(
-          result.message || "Gagal mengambil data produk"
+          response.message || "Gagal mengambil data produk"
         );
       }
 
-      setProducts(result.data ?? []);
+      setProducts(response.data || []);
     } catch (error) {
-      console.error(error);
+      console.error("GET ERROR:", error);
 
       if (error instanceof Error) {
         setError(error.message);
       } else {
-        setError("Terjadi kesalahan.");
+        setError("Gagal mengambil data produk");
       }
     } finally {
       setLoading(false);
     }
   }
 
+  // =========================
+  // LOAD DATA
+  // =========================
   useEffect(() => {
     getProducts();
   }, []);
@@ -77,9 +80,11 @@ export default function Home() {
   }
 
   // =========================
-  // TAMBAH / EDIT
+  // CREATE / UPDATE
   // =========================
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     setError("");
@@ -103,21 +108,19 @@ export default function Home() {
     try {
       setSaving(true);
 
-      if (!API_URL) {
-        throw new Error("NEXT_PUBLIC_API_URL belum ditemukan.");
-      }
-
       const isEditing = editingId !== null;
 
       const url = isEditing
         ? `${API_URL}/api/products/${editingId}`
         : `${API_URL}/api/products`;
 
-      const response = await fetch(url, {
+      const res = await fetch(url, {
         method: isEditing ? "PUT" : "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           name: name.trim(),
           price: Number(price),
@@ -125,11 +128,11 @@ export default function Home() {
         }),
       });
 
-      const result = await response.json();
+      const response = await res.json();
 
-      if (!response.ok || !result.success) {
+      if (!res.ok || !response.success) {
         throw new Error(
-          result.message || "Gagal menyimpan produk"
+          response.message || "Gagal menyimpan produk"
         );
       }
 
@@ -143,12 +146,12 @@ export default function Home() {
 
       await getProducts();
     } catch (error) {
-      console.error(error);
+      console.error("SAVE ERROR:", error);
 
       if (error instanceof Error) {
         setError(error.message);
       } else {
-        setError("Terjadi kesalahan.");
+        setError("Gagal menyimpan produk");
       }
     } finally {
       setSaving(false);
@@ -160,12 +163,13 @@ export default function Home() {
   // =========================
   function handleEdit(product: Product) {
     setEditingId(product.id);
+
     setName(product.name);
     setPrice(String(product.price));
     setStock(String(product.stock));
 
-    setError("");
     setMessage("");
+    setError("");
 
     window.scrollTo({
       top: 0,
@@ -189,22 +193,18 @@ export default function Home() {
       setError("");
       setMessage("");
 
-      if (!API_URL) {
-        throw new Error("NEXT_PUBLIC_API_URL belum ditemukan.");
-      }
-
-      const response = await fetch(
+      const res = await fetch(
         `${API_URL}/api/products/${id}`,
         {
           method: "DELETE",
         }
       );
 
-      const result = await response.json();
+      const response = await res.json();
 
-      if (!response.ok || !result.success) {
+      if (!res.ok || !response.success) {
         throw new Error(
-          result.message || "Gagal menghapus produk"
+          response.message || "Gagal menghapus produk"
         );
       }
 
@@ -216,12 +216,12 @@ export default function Home() {
 
       await getProducts();
     } catch (error) {
-      console.error(error);
+      console.error("DELETE ERROR:", error);
 
       if (error instanceof Error) {
         setError(error.message);
       } else {
-        setError("Terjadi kesalahan.");
+        setError("Gagal menghapus produk");
       }
     }
   }
@@ -233,25 +233,35 @@ export default function Home() {
         {/* HEADER */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            Produk
+            CRUD Produk
           </h1>
+
+          <p className="mt-2 text-gray-600">
+            Frontend Next.js → Backend Vercel → Supabase
+          </p>
         </div>
 
-        {/* MESSAGE */}
+        {/* SUCCESS MESSAGE */}
         {message && (
-          <div className="mb-5 rounded-lg border border-green-300 bg-green-50 p-4 text-green-700">
-            {message}
+          <div className="mb-5 rounded-lg border border-green-300 bg-green-50 p-4">
+            <p className="font-medium text-green-700">
+              {message}
+            </p>
           </div>
         )}
 
+        {/* ERROR MESSAGE */}
         {error && (
-          <div className="mb-5 rounded-lg border border-red-300 bg-red-50 p-4 text-red-700">
-            {error}
+          <div className="mb-5 rounded-lg border border-red-300 bg-red-50 p-4">
+            <p className="font-medium text-red-700">
+              {error}
+            </p>
           </div>
         )}
 
         {/* FORM */}
         <section className="mb-8 rounded-xl bg-white p-6 shadow-md">
+
           <h2 className="mb-5 text-xl font-bold text-gray-900">
             {editingId !== null
               ? "Edit Produk"
@@ -260,10 +270,10 @@ export default function Home() {
 
           <form
             onSubmit={handleSubmit}
-            className="grid gap-4 md:grid-cols-3"
+            className="grid gap-5 md:grid-cols-3"
           >
 
-            {/* NAMA */}
+            {/* NAME */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Nama Produk
@@ -272,13 +282,15 @@ export default function Home() {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) =>
+                  setName(e.target.value)
+                }
                 placeholder="Contoh: Laptop"
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-blue-500"
               />
             </div>
 
-            {/* HARGA */}
+            {/* PRICE */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Harga
@@ -287,14 +299,16 @@ export default function Home() {
               <input
                 type="number"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={(e) =>
+                  setPrice(e.target.value)
+                }
                 placeholder="Contoh: 5000000"
                 min="0"
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-blue-500"
               />
             </div>
 
-            {/* STOK */}
+            {/* STOCK */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Stok
@@ -303,7 +317,9 @@ export default function Home() {
               <input
                 type="number"
                 value={stock}
-                onChange={(e) => setStock(e.target.value)}
+                onChange={(e) =>
+                  setStock(e.target.value)
+                }
                 placeholder="Contoh: 10"
                 min="0"
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-blue-500"
@@ -339,64 +355,83 @@ export default function Home() {
           </form>
         </section>
 
-        {/* DATA PRODUK */}
+        {/* PRODUCT LIST */}
         <section className="rounded-xl bg-white p-6 shadow-md">
 
           <div className="mb-5 flex items-center justify-between">
+
             <h2 className="text-xl font-bold text-gray-900">
               Daftar Produk
             </h2>
 
             <button
               onClick={getProducts}
-              className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900"
+              disabled={loading}
+              className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
             >
               Refresh
             </button>
+
           </div>
 
-          {loading ? (
-            <div className="py-10 text-center text-gray-500">
-              Loading...
+          {/* LOADING */}
+          {loading && (
+            <div className="py-10 text-center">
+              <p className="text-gray-500">
+                Loading data produk...
+              </p>
             </div>
-          ) : products.length === 0 ? (
-            <div className="py-10 text-center text-gray-500">
-              Belum ada produk.
+          )}
+
+          {/* EMPTY */}
+          {!loading && products.length === 0 && (
+            <div className="py-10 text-center">
+              <p className="text-gray-500">
+                Belum ada produk.
+              </p>
             </div>
-          ) : (
+          )}
+
+          {/* TABLE */}
+          {!loading && products.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[650px] border-collapse">
+
+              <table className="w-full min-w-[700px] border-collapse">
 
                 <thead>
-                  <tr className="border-b bg-gray-50 text-left">
-                    <th className="px-4 py-4 text-sm font-semibold text-gray-700">
+                  <tr className="border-b bg-gray-50">
+
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700">
                       ID
                     </th>
 
-                    <th className="px-4 py-4 text-sm font-semibold text-gray-700">
-                      Nama
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700">
+                      Nama Produk
                     </th>
 
-                    <th className="px-4 py-4 text-sm font-semibold text-gray-700">
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700">
                       Harga
                     </th>
 
-                    <th className="px-4 py-4 text-sm font-semibold text-gray-700">
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700">
                       Stok
                     </th>
 
-                    <th className="px-4 py-4 text-sm font-semibold text-gray-700">
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-700">
                       Aksi
                     </th>
+
                   </tr>
                 </thead>
 
                 <tbody>
+
                   {products.map((product) => (
                     <tr
                       key={product.id}
                       className="border-b last:border-b-0"
                     >
+
                       <td className="px-4 py-4 text-gray-700">
                         {product.id}
                       </td>
@@ -407,9 +442,9 @@ export default function Home() {
 
                       <td className="px-4 py-4 text-gray-700">
                         Rp{" "}
-                        {Number(product.price).toLocaleString(
-                          "id-ID"
-                        )}
+                        {Number(
+                          product.price
+                        ).toLocaleString("id-ID")}
                       </td>
 
                       <td className="px-4 py-4 text-gray-700">
@@ -417,10 +452,13 @@ export default function Home() {
                       </td>
 
                       <td className="px-4 py-4">
+
                         <div className="flex gap-2">
 
                           <button
-                            onClick={() => handleEdit(product)}
+                            onClick={() =>
+                              handleEdit(product)
+                            }
                             className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-600"
                           >
                             Edit
@@ -436,12 +474,16 @@ export default function Home() {
                           </button>
 
                         </div>
+
                       </td>
+
                     </tr>
                   ))}
+
                 </tbody>
 
               </table>
+
             </div>
           )}
 
